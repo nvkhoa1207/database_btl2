@@ -1,0 +1,924 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <title>Admin Dashboard - Ticket4U</title>
+
+  <link rel="stylesheet" href="assets/css/style-starter.css">
+  <link href="//fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300;0,400;0,600;0,700;1,600&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --admin-primary: #df0e62;
+      --admin-primary-dark: #b8094e;
+      --admin-green: #2ecc71;
+      --admin-red: #e74c3c;
+      --admin-yellow: #f1c40f;
+      --admin-card-shadow: 0 14px 35px rgba(0, 0, 0, 0.18);
+    }
+
+    body {
+      font-family: 'Open Sans', sans-serif;
+      background: var(--theme-bg);
+      color: var(--theme-title);
+    }
+
+    .admin-breadcrumbs {
+      margin-top: 76px;
+      padding: 14px 0;
+      background: var(--theme-bg);
+      border-bottom: 1px solid var(--theme-border);
+    }
+
+    .admin-breadcrumbs a,
+    .admin-breadcrumbs span {
+      color: var(--theme-para);
+      font-size: 14px;
+    }
+
+    .admin-breadcrumbs span:last-child {
+      color: var(--admin-primary);
+      font-weight: 600;
+    }
+
+    .admin-section {
+      padding: 42px 0 64px;
+      background: var(--theme-bg);
+    }
+
+    .admin-hero {
+      display: grid;
+      grid-template-columns: 1.4fr 0.6fr;
+      gap: 24px;
+      align-items: stretch;
+      margin-bottom: 26px;
+    }
+
+    .admin-hero-card {
+      background: var(--theme-bg);
+      border: 1px solid var(--theme-border);
+      border-radius: 16px;
+      box-shadow: var(--admin-card-shadow);
+      padding: 28px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .admin-hero-card::after {
+      content: "";
+      position: absolute;
+      right: -60px;
+      top: -60px;
+      width: 190px;
+      height: 190px;
+      background: rgba(223, 14, 98, 0.18);
+      border-radius: 50%;
+    }
+
+    .admin-kicker {
+      color: var(--admin-primary);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-size: 13px;
+      margin-bottom: 10px;
+    }
+
+    .admin-title {
+      font-size: 34px;
+      line-height: 1.2;
+      font-weight: 700;
+      color: var(--theme-title);
+      margin-bottom: 12px;
+    }
+
+    .admin-text {
+      color: var(--theme-para);
+      margin-bottom: 0;
+      max-width: 780px;
+    }
+
+    .admin-stat-card {
+      background: linear-gradient(135deg, var(--admin-primary), #8a0f45);
+      color: #fff;
+      border-radius: 16px;
+      padding: 28px;
+      box-shadow: var(--admin-card-shadow);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .admin-stat-card h3 {
+      color: #fff;
+      font-size: 42px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .admin-stat-card p {
+      margin: 0;
+      opacity: 0.9;
+    }
+
+    .admin-card {
+      background: var(--theme-bg);
+      border: 1px solid var(--theme-border);
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 26px;
+      box-shadow: var(--admin-card-shadow);
+    }
+
+    .admin-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .admin-card-header h3 {
+      color: var(--theme-title);
+      font-size: 22px;
+      font-weight: 700;
+      margin: 0;
+    }
+
+    .admin-badge {
+      background: rgba(223, 14, 98, 0.12);
+      color: var(--admin-primary);
+      border-radius: 999px;
+      padding: 7px 12px;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .admin-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 14px;
+      align-items: end;
+    }
+
+    .admin-grid.two-buttons {
+      grid-template-columns: 1.2fr 1.2fr 1fr 1fr 1fr;
+    }
+
+    .admin-field label {
+      display: block;
+      color: var(--theme-title);
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 7px;
+    }
+
+    .admin-field input,
+    .admin-field select {
+      width: 100%;
+      height: 44px;
+      border-radius: 8px;
+      border: 1px solid var(--theme-border);
+      background: var(--theme-bg);
+      color: var(--theme-title);
+      padding: 0 12px;
+      outline: none;
+      transition: all 0.2s ease;
+    }
+
+    .admin-field input:focus,
+    .admin-field select:focus {
+      border-color: var(--admin-primary);
+      box-shadow: 0 0 0 3px rgba(223, 14, 98, 0.12);
+    }
+
+    .admin-field input::placeholder {
+      color: var(--theme-para);
+    }
+
+    .admin-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 18px;
+    }
+
+    .admin-btn {
+      border: none;
+      border-radius: 8px;
+      padding: 11px 18px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .admin-btn:hover {
+      transform: translateY(-1px);
+      opacity: 0.92;
+    }
+
+    .admin-btn.primary {
+      background: var(--admin-primary);
+      color: #fff;
+    }
+
+    .admin-btn.dark {
+      background: var(--theme-title);
+      color: var(--theme-bg);
+    }
+
+    .admin-btn.soft {
+      background: rgba(223, 14, 98, 0.12);
+      color: var(--admin-primary);
+    }
+
+    .admin-btn.danger {
+      background: var(--admin-red);
+      color: #fff;
+    }
+
+    .admin-btn.small {
+      padding: 8px 11px;
+      font-size: 12px;
+      border-radius: 7px;
+    }
+
+    .admin-message {
+      display: none;
+      margin-top: 16px;
+      padding: 13px 14px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .admin-message.success {
+      display: block;
+      background: rgba(46, 204, 113, 0.12);
+      color: var(--admin-green);
+      border: 1px solid rgba(46, 204, 113, 0.25);
+    }
+
+    .admin-message.error {
+      display: block;
+      background: rgba(231, 76, 60, 0.12);
+      color: var(--admin-red);
+      border: 1px solid rgba(231, 76, 60, 0.25);
+    }
+
+    .admin-table-wrap {
+      overflow-x: auto;
+      border: 1px solid var(--theme-border);
+      border-radius: 12px;
+      margin-top: 18px;
+    }
+
+    .admin-table {
+      width: 100%;
+      min-width: 980px;
+      border-collapse: collapse;
+      color: var(--theme-title);
+      background: var(--theme-bg);
+    }
+
+    .admin-table th,
+    .admin-table td {
+      padding: 14px 14px;
+      border-bottom: 1px solid var(--theme-border);
+      vertical-align: middle;
+      font-size: 14px;
+    }
+
+    .admin-table th {
+      color: var(--admin-primary);
+      font-weight: 700;
+      cursor: pointer;
+      background: rgba(223, 14, 98, 0.06);
+      white-space: nowrap;
+    }
+
+    .admin-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .admin-table td {
+      color: var(--theme-para);
+    }
+
+    .code-pill {
+      color: #fff;
+      background: var(--admin-primary);
+      border-radius: 999px;
+      padding: 5px 10px;
+      font-weight: 700;
+      font-size: 12px;
+      display: inline-block;
+    }
+
+    .row-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .function-grid {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr auto 1.3fr;
+      gap: 14px;
+      align-items: end;
+    }
+
+    .footer-space {
+      height: 10px;
+    }
+
+    @media (max-width: 991px) {
+      .admin-hero,
+      .admin-grid,
+      .admin-grid.two-buttons,
+      .function-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .admin-title {
+        font-size: 28px;
+      }
+
+      .admin-section {
+        padding-top: 26px;
+      }
+    }
+    
+  </style>
+  .admin-page {
+    font-size: 14px;
+  }
+  
+  .admin-card input,
+  .admin-card select,
+  .admin-card button {
+    font-size: 13px;
+  }
+  
+  .admin-table th,
+  .admin-table td {
+    font-size: 12.5px;
+    padding: 8px 10px;
+  }
+  
+  .admin-section-title {
+    font-size: 22px;
+  }
+</head>
+
+<body>
+  <header id="site-header" class="w3l-header fixed-top">
+    <nav class="navbar navbar-expand-lg navbar-light fill px-lg-0 py-0 px-3">
+      <div class="container">
+        <h1><a class="navbar-brand" href="index.html"><span class="fa fa-play icon-log" aria-hidden="true"></span>
+            Ticket4U</a></h1>
+
+        <button class="navbar-toggler collapsed" type="button" data-toggle="collapse"
+          data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false"
+          aria-label="Toggle navigation">
+          <span class="fa icon-expand fa-bars"></span>
+          <span class="fa icon-close fa-times"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="navbarSupportedContent">
+          <ul class="navbar-nav ml-auto">
+            <li class="nav-item"><a class="nav-link" href="index.html">Home</a></li>
+            <li class="nav-item"><a class="nav-link" href="movies.html">Movies</a></li>
+            <li class="nav-item"><a class="nav-link" href="about.html">About</a></li>
+            <li class="nav-item"><a class="nav-link" href="Contact_Us.html">Contact</a></li>
+            <li class="nav-item active"><a class="nav-link" href="admin-discounts.html">Admin</a></li>
+          </ul>
+
+          <div class="search-right">
+            <a href="#search" class="btn search-hny mr-lg-3 mt-lg-0 mt-4" title="search">Search <span
+                class="fa fa-search ml-3" aria-hidden="true"></span></a>
+            <div id="search" class="pop-overlay">
+              <div class="popup">
+                <form action="#" method="post" class="search-box">
+                  <input type="search" placeholder="Search your Keyword" name="search" required="required" autofocus="">
+                  <button type="submit" class="btn"><span class="fa fa-search" aria-hidden="true"></span></button>
+                </form>
+                <div class="browse-items">
+                  <h3 class="hny-title two mt-md-5 mt-4">Browse all:</h3>
+                  <ul class="search-items">
+                    <li><a href="movies.html">Action</a></li>
+                    <li><a href="movies.html">Drama</a></li>
+                    <li><a href="movies.html">Family</a></li>
+                    <li><a href="movies.html">Thriller</a></li>
+                    <li><a href="movies.html">Comedy</a></li>
+                    <li><a href="movies.html">Romantic</a></li>
+                    <li><a href="movies.html">TV Series</a></li>
+                    <li><a href="movies.html">Horror</a></li>
+                  </ul>
+                </div>
+              </div>
+              <a class="close" href="#close">×</a>
+            </div>
+          </div>
+
+          <div class="Login_SignUp" id="login" style="font-size: 2rem; display: inline-block; position: relative;">
+            <a class="nav-link" href="sign_in.html"><i class="fa fa-user-circle-o"></i></a>
+          </div>
+        </div>
+
+        <div class="mobile-position">
+          <nav class="navigation">
+            <div class="theme-switch-wrapper">
+              <label class="theme-switch" for="checkbox">
+                <input type="checkbox" id="checkbox">
+                <div class="mode-container">
+                  <i class="gg-sun"></i>
+                  <i class="gg-moon"></i>
+                </div>
+              </label>
+            </div>
+          </nav>
+        </div>
+      </div>
+    </nav>
+  </header>
+
+  <div class="admin-breadcrumbs">
+    <div class="container page-wrapper">
+      <a href="index.html">Home</a> » <span>Admin Dashboard</span>
+    </div>
+  </div>
+
+  <section class="admin-section">
+    <div class="container py-lg-4">
+      <div class="admin-hero">
+        <div class="admin-hero-card">
+          <div class="admin-kicker">Database Application Demo</div>
+          <h2 class="admin-title">Discount Management Dashboard</h2>
+          <p class="admin-text">
+            This interface demonstrates real database connectivity by calling MySQL stored procedures and functions for
+            discount management, usage reporting, and calculated business values.
+          </p>
+        </div>
+        <div class="admin-stat-card">
+          <h3 id="discountCount">0</h3>
+          <p>Discount records loaded from the database</p>
+        </div>
+      </div>
+
+      <div class="admin-card">
+        <div class="admin-card-header">
+          <h3>1. Discount Management</h3>
+          <span class="admin-badge">Insert / Update / Delete</span>
+        </div>
+
+        <div class="admin-grid">
+          <div class="admin-field">
+            <label for="discountCode">Discount Code</label>
+            <input id="discountCode" placeholder="Example: D010">
+          </div>
+          <div class="admin-field">
+            <label for="discountName">Discount Name</label>
+            <input id="discountName" placeholder="Example: Late Night Combo">
+          </div>
+          <div class="admin-field">
+            <label for="discountValue">Discount Value</label>
+            <input id="discountValue" type="number" placeholder="Example: 35000">
+          </div>
+          <div class="admin-field">
+            <label for="expiryDate">Expiry Date</label>
+            <input id="expiryDate" type="date">
+          </div>
+          <div class="admin-field">
+            <label for="adminId">Admin</label>
+            <select id="adminId"></select>
+          </div>
+        </div>
+
+        <div class="admin-actions">
+          <button class="admin-btn primary" onclick="createDiscount()">Create Discount</button>
+          <button class="admin-btn dark" onclick="updateDiscount()">Update Discount</button>
+          <button class="admin-btn soft" onclick="clearForm()">Clear Form</button>
+        </div>
+
+        <div id="formMessage" class="admin-message"></div>
+      </div>
+
+      <div class="admin-card">
+        <div class="admin-card-header">
+          <h3>2. Discount Usage Report</h3>
+          <span class="admin-badge">Stored Procedure Report</span>
+        </div>
+
+        <div class="admin-grid two-buttons">
+          <div class="admin-field">
+            <label for="filterAdmin">Admin Filter</label>
+            <select id="filterAdmin">
+              <option value="">All Admins</option>
+            </select>
+          </div>
+          <div class="admin-field">
+            <label for="onlyActive">Discount Status</label>
+            <select id="onlyActive">
+              <option value="true">Only Active</option>
+              <option value="false">All Discounts</option>
+            </select>
+          </div>
+          <div class="admin-field">
+            <label for="minBookings">Minimum Bookings</label>
+            <input id="minBookings" type="number" value="0">
+          </div>
+          <div class="admin-field">
+            <label for="minRevenue">Minimum Revenue</label>
+            <input id="minRevenue" type="number" value="0">
+          </div>
+          <button class="admin-btn primary" onclick="loadReport()">Search Report</button>
+        </div>
+
+        <div class="admin-table-wrap">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th onclick="sortReport('DiscountCode')">Code</th>
+                <th onclick="sortReport('Name')">Name</th>
+                <th onclick="sortReport('AdminID')">Admin</th>
+                <th onclick="sortReport('total_bookings')">Bookings</th>
+                <th onclick="sortReport('total_revenue_after_discount')">Revenue</th>
+                <th onclick="sortReport('avg_booking_value')">Average Value</th>
+                <th onclick="sortReport('latest_usage_date')">Latest Usage</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="reportBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="admin-card">
+        <div class="admin-card-header">
+          <h3>3. Function Demo</h3>
+          <span class="admin-badge">MySQL Functions</span>
+        </div>
+
+        <div class="function-grid">
+          <div class="admin-field">
+            <label for="bookingId">Booking ID</label>
+            <input id="bookingId" value="B001" placeholder="Example: B001">
+          </div>
+          <button class="admin-btn primary" onclick="calculateBookingTotal()">Calculate Booking Total</button>
+
+          <div class="admin-field">
+            <label for="customerId">Customer ID</label>
+            <input id="customerId" value="U003" placeholder="Example: U003">
+          </div>
+          <button class="admin-btn dark" onclick="calculateCustomerPoints()">Calculate Points</button>
+
+          <div class="admin-field">
+            <label for="functionResult">Result</label>
+            <input id="functionResult" placeholder="Result will appear here" readonly>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="w3l-footer">
+    <section class="footer-inner-main">
+      <div class="below-section">
+        <div class="container">
+          <div class="copyright-footer">
+            <div class="columns text-lg-left">
+              <p>Ticket4U Database Application Demo</p>
+            </div>
+            <ul class="social text-lg-right">
+              <li><a href="#facebook"><span class="fa fa-facebook" aria-hidden="true"></span></a></li>
+              <li><a href="#linkedin"><span class="fa fa-linkedin" aria-hidden="true"></span></a></li>
+              <li><a href="#twitter"><span class="fa fa-twitter" aria-hidden="true"></span></a></li>
+              <li><a href="#google"><span class="fa fa-google-plus" aria-hidden="true"></span></a></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <button onclick="topFunction()" id="movetop" title="Go to top">
+        <span class="fa fa-arrow-up" aria-hidden="true"></span>
+      </button>
+    </section>
+  </footer>
+
+  <script src="assets/js/jquery-3.3.1.min.js"></script>
+  <script src="assets/js/theme-change.js"></script>
+  <script src="assets/js/bootstrap.min.js"></script>
+
+  <script>
+    const API_URL = "http://localhost:3000/api";
+    let reportData = [];
+    let sortDirection = 1;
+
+    function showMessage(text, type) {
+      const box = document.getElementById("formMessage");
+      box.textContent = text;
+      box.className = "admin-message " + type;
+    }
+
+    function formatMoney(value) {
+      return Number(value || 0).toLocaleString("en-US") + " VND";
+    }
+
+    function formatDate(value) {
+      if (!value) return "No usage yet";
+      return new Date(value).toLocaleString("en-GB");
+    }
+
+    async function loadAdmins() {
+      try {
+        const res = await fetch(`${API_URL}/admins`);
+        const admins = await res.json();
+
+        const adminSelect = document.getElementById("adminId");
+        const filterAdmin = document.getElementById("filterAdmin");
+
+        adminSelect.innerHTML = "";
+        filterAdmin.innerHTML = `<option value="">All Admins</option>`;
+
+        admins.forEach(admin => {
+          const label = `${admin.StaffID} - ${admin.Full_name}`;
+          adminSelect.innerHTML += `<option value="${admin.StaffID}">${label}</option>`;
+          filterAdmin.innerHTML += `<option value="${admin.StaffID}">${label}</option>`;
+        });
+      } catch (error) {
+        showMessage("Unable to load admin list. Please check the backend server.", "error");
+      }
+    }
+
+    async function loadReport() {
+      try {
+        const adminId = document.getElementById("filterAdmin").value;
+        const onlyActive = document.getElementById("onlyActive").value;
+        const minBookings = document.getElementById("minBookings").value || 0;
+        const minRevenue = document.getElementById("minRevenue").value || 0;
+
+        const url = `${API_URL}/discount-usage-report?adminId=${adminId}&onlyActive=${onlyActive}&minBookings=${minBookings}&minRevenue=${minRevenue}`;
+        const res = await fetch(url);
+        reportData = await res.json();
+
+        if (!res.ok) {
+          showMessage(reportData.message || "Unable to load discount usage report.", "error");
+          return;
+        }
+
+        renderReport(reportData);
+        document.getElementById("discountCount").textContent = reportData.length;
+      } catch (error) {
+        showMessage("Unable to load report. Please check the backend server.", "error");
+      }
+    }
+
+    function renderReport(data) {
+      const body = document.getElementById("reportBody");
+      body.innerHTML = "";
+
+      if (!data || data.length === 0) {
+        body.innerHTML = `
+          <tr>
+            <td colspan="8" style="text-align:center; padding: 22px;">No discount records found.</td>
+          </tr>
+        `;
+        return;
+      }
+
+      data.forEach(row => {
+        body.innerHTML += `
+          <tr>
+            <td><span class="code-pill">${row.DiscountCode}</span></td>
+            <td>${row.Name}</td>
+            <td>${row.AdminID}</td>
+            <td>${row.total_bookings}</td>
+            <td>${formatMoney(row.total_revenue_after_discount)}</td>
+            <td>${formatMoney(row.avg_booking_value)}</td>
+            <td>${formatDate(row.latest_usage_date)}</td>
+            <td>
+              <div class="row-actions">
+                <button class="admin-btn small soft" onclick='fillForm(${JSON.stringify(row)})'>Edit</button>
+                <button class="admin-btn small danger" onclick="deleteDiscount('${row.DiscountCode}')">Delete</button>
+              </div>
+            </td>
+          </tr>
+        `;
+      });
+    }
+
+    function sortReport(field) {
+      reportData.sort((a, b) => {
+        const x = a[field] || "";
+        const y = b[field] || "";
+
+        if (!isNaN(Number(x)) && !isNaN(Number(y))) {
+          return (Number(x) - Number(y)) * sortDirection;
+        }
+
+        return String(x).localeCompare(String(y)) * sortDirection;
+      });
+
+      sortDirection *= -1;
+      renderReport(reportData);
+    }
+
+    function fillForm(row) {
+      document.getElementById("discountCode").value = row.DiscountCode;
+      document.getElementById("discountName").value = row.Name;
+      document.getElementById("discountValue").value = "";
+      document.getElementById("expiryDate").value = "";
+      document.getElementById("adminId").value = row.AdminID;
+
+      showMessage("Discount selected. Enter a new value and expiry date, then click Update Discount.", "success");
+    }
+
+    function clearForm() {
+      document.getElementById("discountCode").value = "";
+      document.getElementById("discountName").value = "";
+      document.getElementById("discountValue").value = "";
+      document.getElementById("expiryDate").value = "";
+      document.getElementById("formMessage").className = "admin-message";
+    }
+
+    function getFormData() {
+      return {
+        discountCode: document.getElementById("discountCode").value.trim(),
+        name: document.getElementById("discountName").value.trim(),
+        discountValue: Number(document.getElementById("discountValue").value),
+        expiryDate: document.getElementById("expiryDate").value,
+        adminId: document.getElementById("adminId").value
+      };
+    }
+
+    function validateForm(data) {
+      if (!data.discountCode) return "Discount code cannot be empty.";
+      if (!data.name) return "Discount name cannot be empty.";
+      if (Number.isNaN(data.discountValue) || data.discountValue < 0) return "Discount value must be non-negative.";
+      if (!data.expiryDate) return "Expiry date cannot be empty.";
+      if (!data.adminId) return "Admin must be selected.";
+      return null;
+    }
+
+    async function createDiscount() {
+      const data = getFormData();
+      const error = validateForm(data);
+
+      if (error) {
+        showMessage(error, "error");
+        return;
+      }
+
+      const res = await fetch(`${API_URL}/discounts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data)
+      });
+
+      const result = await res.json();
+
+      if (!res.ok) {
+        showMessage(result.message, "error");
+        return;
+      }
+
+      showMessage(result.message, "success");
+      await loadReport();
+    }
+
+    async function updateDiscount() {
+      const data = getFormData();
+      const error = validateForm(data);
+
+      if (error) {
+        showMessage(error, "error");
+        return;
+      }
+
+      const res = await fetch(`${API_URL}/discounts/${data.discountCode}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data)
+      });
+
+      const result = await res.json();
+
+      if (!res.ok) {
+        showMessage(result.message, "error");
+        return;
+      }
+
+      showMessage(result.message, "success");
+      await loadReport();
+    }
+
+    async function deleteDiscount(code) {
+      const confirmDelete = confirm(`Delete discount ${code}?`);
+      if (!confirmDelete) return;
+
+      const res = await fetch(`${API_URL}/discounts/${code}`, { method: "DELETE" });
+      const result = await res.json();
+
+      if (!res.ok) {
+        showMessage(result.message, "error");
+        return;
+      }
+
+      showMessage(result.message, "success");
+      await loadReport();
+    }
+
+    async function calculateBookingTotal() {
+      const bookingId = document.getElementById("bookingId").value.trim();
+
+      const res = await fetch(`${API_URL}/functions/booking-total/${bookingId}`);
+      const result = await res.json();
+
+      if (!res.ok) {
+        document.getElementById("functionResult").value = result.message;
+        return;
+      }
+
+      document.getElementById("functionResult").value = "Booking total: " + formatMoney(result.booking_total);
+    }
+
+    async function calculateCustomerPoints() {
+      const customerId = document.getElementById("customerId").value.trim();
+
+      const res = await fetch(`${API_URL}/functions/customer-points/${customerId}`);
+      const result = await res.json();
+
+      if (!res.ok) {
+        document.getElementById("functionResult").value = result.message;
+        return;
+      }
+
+      document.getElementById("functionResult").value = "Loyalty points: " + result.loyalty_points;
+    }
+
+    window.onscroll = function () {
+      scrollFunction();
+    };
+
+    function scrollFunction() {
+      const moveTop = document.getElementById("movetop");
+      if (!moveTop) return;
+
+      if (document.body.scrollTop > 20 || document.documentElement.scrollTop > 20) {
+        moveTop.style.display = "block";
+      } else {
+        moveTop.style.display = "none";
+      }
+    }
+
+    function topFunction() {
+      document.body.scrollTop = 0;
+      document.documentElement.scrollTop = 0;
+    }
+
+    $(function () {
+      $('.navbar-toggler').click(function () {
+        $('body').toggleClass('noscroll');
+      });
+    });
+
+    $(window).on("scroll", function () {
+      const scroll = $(window).scrollTop();
+
+      if (scroll >= 80) {
+        $("#site-header").addClass("nav-fixed");
+      } else {
+        $("#site-header").removeClass("nav-fixed");
+      }
+    });
+
+    $(".navbar-toggler").on("click", function () {
+      $("header").toggleClass("active");
+    });
+
+    $(document).on("ready", function () {
+      if ($(window).width() > 991) {
+        $("header").removeClass("active");
+      }
+      $(window).on("resize", function () {
+        if ($(window).width() > 991) {
+          $("header").removeClass("active");
+        }
+      });
+    });
+
+    loadAdmins();
+    loadReport();
+  </script>
+</body>
+
+</html>
