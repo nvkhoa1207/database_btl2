@@ -1,11 +1,14 @@
+const path = require("path");
 const express = require("express");
+
 const cors = require("cors");
+
 const pool = require("./db");
-
 const app = express();
-
+const db = require("./db");
 app.use(cors());
 app.use(express.json());
+app.use(express.static(path.join(__dirname, "..")));
 
 function getSqlError(error) {
   return error.sqlMessage || error.message || "Database error";
@@ -162,8 +165,384 @@ app.get("/api/functions/customer-points/:customerId", async (req, res) => {
   }
 });
 
-const port = process.env.PORT || 3000;
 
-app.listen(port, () => {
-  console.log(`Backend running at http://localhost:${port}`);
+
+
+
+app.get("/api/showtimes", async (req, res) => {
+  try {
+    const [rows] = await db.query(`
+      SELECT
+        s.ShowID,
+        s.Start_datetime,
+        s.End_datetime,
+        s.RoomNo,
+        s.TheaterID,
+        m.Title AS MovieTitle,
+        m.Age_restriction,
+        t.Name AS TheaterName,
+        r.Name AS RoomName
+      FROM SHOWTIME s
+      JOIN MOVIE m ON m.MovieID = s.MovieID
+      JOIN THEATER t ON t.TheaterID = s.TheaterID
+      JOIN ROOM r ON r.RoomNo = s.RoomNo AND r.TheaterID = s.TheaterID
+      WHERE s.Status IN ('scheduled', 'open')
+      ORDER BY s.Start_datetime;
+    `);
+
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({
+      message: "Cannot load showtimes."
+    });
+  }
 });
+
+
+app.get("/api/showtimes/:showId/seats", async (req, res) => {
+  try {
+    const { showId } = req.params;
+
+    const [rows] = await db.query(
+      `
+      SELECT
+        se.SeatID,
+        se.Seat_type,
+        se.Condition,
+        CASE
+          WHEN se.Condition = 'broken' THEN 'broken'
+          WHEN tk.TicketNo IS NOT NULL THEN 'booked'
+          ELSE 'available'
+        END AS SeatStatus
+      FROM SHOWTIME sh
+      JOIN SEAT se
+        ON se.RoomNo = sh.RoomNo
+       AND se.TheaterID = sh.TheaterID
+      LEFT JOIN TICKET tk
+        ON tk.SeatID = se.SeatID
+       AND tk.RoomNo = se.RoomNo
+       AND tk.TheaterID = se.TheaterID
+       AND tk.ShowID = sh.ShowID
+      WHERE sh.ShowID = ?
+      ORDER BY se.SeatID;
+      `,
+      [showId]
+    );
+
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({
+      message: "Cannot load seats.",
+      error: err.message
+    });
+  }
+});
+
+function makeId(prefix, length = 6) {
+  const randomPart = Math.floor(Math.random() * 10 ** length)
+    .toString()
+    .padStart(length, "0");
+
+  return `${prefix}${randomPart}`;
+}
+
+function getPriceBySeatType(seatType) {
+  if (seatType === "VIP") return 120000;
+  if (seatType === "Sweetbox") return 150000;
+  return 90000;
+}
+
+app.post("/api/bookings", async (req, res) => {
+  const conn = await db.getConnection();
+
+  try {
+    const {
+      customerId = "U001",
+      showId,
+      seats,
+      discountCode = null
+    } = req.body;
+
+    if (!showId) {
+      return res.status(400).json({ message: "Showtime is required." });
+    }
+
+    if (!Array.isArray(seats) || seats.length === 0) {
+      return res.status(400).json({ message: "At least one seat must be selected." });
+    }
+
+    await conn.beginTransaction();
+
+    const [[showtime]] = await conn.query(
+      `
+      SELECT ShowID, RoomNo, TheaterID
+      FROM SHOWTIME
+      WHERE ShowID = ?
+      `,
+      [showId]
+    );
+
+    if (!showtime) {
+      throw new Error("Invalid showtime.");
+    }
+
+    const bookingId = makeId("B");
+    const paymentId = makeId("P");
+
+    await conn.query(
+      `
+      INSERT INTO PAYMENT_METHOD(PaymentID, Amount, Status)
+      VALUES (?, 0, 'Pending')
+      `,
+      [paymentId]
+    );
+
+    await conn.query(
+      `
+      INSERT INTO BOOKING(
+        BookingID, CustomerID, Booking_date, Platform, PaymentID,
+        DiscountCode, Status, Expired_time, Total_price
+      )
+      VALUES (
+        ?, ?, NOW(), 'Web', ?, ?, 'Pending',
+        DATE_ADD(NOW(), INTERVAL 15 MINUTE), 0
+      )
+      `,
+      [bookingId, customerId, paymentId, discountCode]
+    );
+
+    for (const seatId of seats) {
+      const [[seat]] = await conn.query(
+        `
+        SELECT SeatID, Seat_type, \`Condition\`
+        FROM SEAT
+        WHERE SeatID = ?
+          AND RoomNo = ?
+          AND TheaterID = ?
+        `,
+        [seatId, showtime.RoomNo, showtime.TheaterID]
+      );
+
+      if (!seat) {
+        throw new Error(`Seat ${seatId} does not exist.`);
+      }
+
+      if (seat.Condition !== "usable") {
+        throw new Error(`Seat ${seatId} is not usable.`);
+      }
+
+      const [[existingTicket]] = await conn.query(
+        `
+        SELECT TicketNo
+        FROM TICKET
+        WHERE SeatID = ?
+          AND RoomNo = ?
+          AND TheaterID = ?
+          AND ShowID = ?
+        `,
+        [seatId, showtime.RoomNo, showtime.TheaterID, showId]
+      );
+
+      if (existingTicket) {
+        throw new Error(`Seat ${seatId} has already been booked.`);
+      }
+
+      const ticketNo = makeId("TK", 6);
+      const qrCode = `QR-${bookingId}-${seatId}`;
+      const price = getPriceBySeatType(seat.Seat_type);
+
+      await conn.query(
+        `
+        INSERT INTO TICKET(
+          TicketNo, BookingID, ShowID, SeatID, RoomNo, TheaterID,
+          Scanned_by, Price, Qr_code
+        )
+        VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?)
+        `,
+        [
+          ticketNo,
+          bookingId,
+          showId,
+          seatId,
+          showtime.RoomNo,
+          showtime.TheaterID,
+          price,
+          qrCode
+        ]
+      );
+    }
+
+    const [[booking]] = await conn.query(
+      `
+      SELECT BookingID, CustomerID, PaymentID, DiscountCode, Status, Total_price
+      FROM BOOKING
+      WHERE BookingID = ?
+      `,
+      [bookingId]
+    );
+
+    await conn.commit();
+
+    res.json({
+      message: "Booking created successfully.",
+      booking
+    });
+  } catch (err) {
+    await conn.rollback();
+
+    res.status(400).json({
+      message: err.sqlMessage || err.message
+    });
+  } finally {
+    conn.release();
+  }
+});
+
+app.put("/api/bookings/:bookingId/pay", async (req, res) => {
+  const conn = await db.getConnection();
+
+  try {
+    const { bookingId } = req.params;
+
+    await conn.beginTransaction();
+
+    const [[booking]] = await conn.query(
+      `
+      SELECT BookingID, PaymentID, Total_price, Status
+      FROM BOOKING
+      WHERE BookingID = ?
+      FOR UPDATE
+      `,
+      [bookingId]
+    );
+
+    if (!booking) {
+      throw new Error("Booking does not exist.");
+    }
+
+    if (booking.Status === "Paid") {
+      throw new Error("This booking has already been paid.");
+    }
+
+    if (!booking.PaymentID) {
+      throw new Error("This booking does not have a payment method.");
+    }
+
+    await conn.query(
+      `
+      UPDATE BOOKING
+      SET Status = 'Paid'
+      WHERE BookingID = ?
+      `,
+      [bookingId]
+    );
+
+    await conn.query(
+      `
+      UPDATE PAYMENT_METHOD
+      SET Amount = ?,
+          Status = 'Success'
+      WHERE PaymentID = ?
+      `,
+      [booking.Total_price, booking.PaymentID]
+    );
+
+    const [[updatedBooking]] = await conn.query(
+      `
+      SELECT
+        b.BookingID,
+        b.CustomerID,
+        b.PaymentID,
+        b.Status,
+        b.Total_price,
+        pm.Status AS PaymentStatus,
+        pm.Amount AS PaymentAmount
+      FROM BOOKING b
+      JOIN PAYMENT_METHOD pm ON pm.PaymentID = b.PaymentID
+      WHERE b.BookingID = ?
+      `,
+      [bookingId]
+    );
+
+    await conn.commit();
+
+    res.json({
+      message: "Payment confirmed successfully.",
+      booking: updatedBooking
+    });
+  } catch (err) {
+    await conn.rollback();
+
+    res.status(400).json({
+      message: err.sqlMessage || err.message
+    });
+  } finally {
+    conn.release();
+  }
+});
+const port = process.env.PORT || 3000;
+app.get("/api/bookings/:bookingId/ticket", async (req, res) => {
+  try {
+    const { bookingId } = req.params;
+
+    const [rows] = await db.query(
+      `
+      SELECT
+        b.BookingID,
+        b.Booking_date,
+        b.Status AS BookingStatus,
+        b.Total_price,
+        tk.TicketNo,
+        tk.SeatID,
+        tk.RoomNo,
+        tk.TheaterID,
+        tk.Price,
+        tk.Qr_code,
+        s.ShowID,
+        s.Start_datetime,
+        m.Title AS MovieTitle,
+        th.Name AS TheaterName
+      FROM BOOKING b
+      JOIN TICKET tk ON tk.BookingID = b.BookingID
+      JOIN SHOWTIME s ON s.ShowID = tk.ShowID
+      JOIN MOVIE m ON m.MovieID = s.MovieID
+      JOIN THEATER th ON th.TheaterID = tk.TheaterID
+      WHERE b.BookingID = ?
+      ORDER BY tk.SeatID;
+      `,
+      [bookingId]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({
+        message: "Ticket not found."
+      });
+    }
+
+    res.json({
+      bookingId: rows[0].BookingID,
+      status: rows[0].BookingStatus,
+      totalPrice: rows[0].Total_price,
+      movieTitle: rows[0].MovieTitle,
+      theaterName: rows[0].TheaterName,
+      roomNo: rows[0].RoomNo,
+      showTime: rows[0].Start_datetime,
+      seats: rows.map(row => row.SeatID),
+      tickets: rows
+    });
+  } catch (err) {
+    res.status(500).json({
+      message: err.sqlMessage || err.message
+    });
+  }
+});
+if (process.env.VERCEL !== "1") {
+  app.listen(port, () => {
+    console.log(`Backend running at http://localhost:${port}`);
+  });
+}
+
+module.exports = app;
+

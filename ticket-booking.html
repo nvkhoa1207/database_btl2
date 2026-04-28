@@ -16,6 +16,174 @@
 
   <link rel="stylesheet" type="text/css" href="assets/css/payment.css" />
   <link href="https://fonts.googleapis.com/css?family=Yanone+Kaffeesatz:400,700" rel="stylesheet">
+
+  <style>
+    .showtime-status {
+      margin: 14px 0;
+      padding: 12px 16px;
+      border-radius: 10px;
+      background: rgba(223, 14, 98, 0.08);
+      color: #df0e62;
+      font-weight: 600;
+      font-size: 15px;
+    }
+
+    .dynamic-showtime-li {
+      align-items: center;
+      gap: 16px;
+    }
+
+    .dynamic-showtime-li .screens small {
+      display: block;
+      margin-top: 4px;
+      font-size: 13px;
+      opacity: 0.75;
+      font-weight: 400;
+    }
+
+    .screen-time.selected {
+      background: #df0e62 !important;
+      color: #ffffff !important;
+      border-color: #df0e62 !important;
+      box-shadow: 0 8px 18px rgba(223, 14, 98, 0.24);
+    }
+  </style>
+
+
+  <style>
+    .showtime-status,
+    .seat-status {
+      margin: 12px 0 18px;
+      padding: 12px 14px;
+      border-radius: 10px;
+      background: rgba(223, 14, 98, 0.08);
+      color: var(--theme-title, #222);
+      font-size: 15px;
+      line-height: 1.5;
+    }
+
+    .dynamic-showtime-li .screens small {
+      display: block;
+      margin-top: 4px;
+      font-size: 13px;
+      color: var(--theme-para, #777);
+    }
+
+    .screen-time.selected,
+    .seat-btn.selected {
+      background: #df0e62 !important;
+      color: #fff !important;
+      border-color: #df0e62 !important;
+    }
+
+    .seat-panel {
+      max-width: 820px;
+      margin: 0 auto;
+      padding: 24px;
+      border-radius: 16px;
+      box-shadow: 0 14px 12px 0 var(--theme-border), 0 10px 50px 0 var(--theme-border);
+      background: var(--theme-bg, #fff);
+    }
+
+    .screen-label {
+      width: 80%;
+      margin: 0 auto 28px;
+      padding: 10px;
+      border-radius: 0 0 18px 18px;
+      text-align: center;
+      font-weight: 700;
+      letter-spacing: 1px;
+      color: #fff;
+      background: #df0e62;
+      box-shadow: 0 8px 22px rgba(223, 14, 98, 0.25);
+    }
+
+    .seat-map {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(58px, 1fr));
+      gap: 12px;
+      margin-top: 18px;
+    }
+
+    .seat-btn {
+  min-height: 46px;
+  border: 1px solid #df0e62;
+  border-radius: 10px;
+  background: transparent;
+  color: #ffffff;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.seat-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  background: rgba(223, 14, 98, 0.18);
+  border-color: #df0e62;
+}
+
+.seat-btn.selected {
+  background: #df0e62 !important;
+  color: #ffffff !important;
+  border-color: #df0e62 !important;
+}
+
+.seat-btn.booked {
+  background: #d9d9d9 !important;
+  color: #777777 !important;
+  border: 1px solid #d9d9d9 !important;
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.seat-btn.broken {
+  background: #2b2b2b !important;
+  color: #777777 !important;
+  border: 1px solid #2b2b2b !important;
+  cursor: not-allowed;
+  opacity: 0.75;
+}
+
+    .seat-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 20px;
+      font-size: 14px;
+      color: var(--theme-para, #666);
+    }
+
+    .legend-box {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      margin-right: 6px;
+      border-radius: 4px;
+      vertical-align: middle;
+      border: 1px solid var(--theme-border, #ddd);
+    }
+
+    .legend-available {
+  background: transparent;
+  border: 1px solid #df0e62;
+}
+
+.legend-selected {
+  background: #df0e62;
+  border: 1px solid #df0e62;
+}
+
+.legend-booked {
+  background: #d9d9d9;
+  border: 1px solid #d9d9d9;
+}
+
+.legend-broken {
+  background: #2b2b2b;
+  border: 1px solid #2b2b2b;
+}
+  </style>
+
 </head>
 
 <body>
@@ -100,105 +268,32 @@
                     <div class="date-day">Friday</div>
                   </div>
                 </div>
-                <ul class="time-ul">
-                  <li class="time-li">
-                    <div class="screens">
-                      Screen 1
-                    </div>
-                    <div class="time-btn">
-                      <button class="screen-time" onclick="timeFunction()">
-                        1:05 PM
-                      </button>
-                      <button class="screen-time" onclick="timeFunction()">
-                        4:00 PM
-                      </button>
-                      <button class="screen-time" onclick="timeFunction()">
-                        9:00 PM
-                      </button>
-                    </div>
-                  </li>
-                  <li class="time-li">
-                    <div class="screens">
-                      Screen 2
-                    </div>
-                    <div class="time-btn">
-                      <button class="screen-time" onclick="timeFunction()">
-                        3:00 PM
-                      </button>
-                    </div>
-                  </li>
-                  <li class="time-li">
-                    <div class="screens">
-                      Screen 3
-                    </div>
-                    <div class="time-btn">
-                      <button class="screen-time" onclick="timeFunction()">
-                        9:05 AM
-                      </button>
-                      <button class="screen-time" onclick="timeFunction()">
-                        10:00 PM
-                      </button>
-                    </div>
-                  </li>
-                  <li class="time-li">
-                    <div class="screens">
-                      Screen 4
-                    </div>
-                    <div class="time-btn">
-                      <button class="screen-time" onclick="timeFunction()">
-                        9:05 AM
-                      </button>
-                      <button class="screen-time" onclick="timeFunction()">
-                        11:00 AM
-                      </button>
-                      <button class="screen-time" onclick="timeFunction()">
-                        3:00 PM
-                      </button>
-                      <button class="screen-time" onclick="timeFunction()">
-                        7:00 PM
-                      </button>
-                      <button class="screen-time" onclick="timeFunction()">
-                        10:00 PM
-                      </button>
-                      <button class="screen-time" onclick="timeFunction()">
-                        11:00 PM
-                      </button>
-                    </div>
-                  </li>
-                  <li class="time-li">
-                    <div class="screens">
-                      Screen 5
-                    </div>
-                    <div class="time-btn">
-                      <button class="screen-time" onclick="timeFunction()">
-                        9:05 AM
-                      </button>
-                      <button class="screen-time" onclick="timeFunction()">
-                        12:00 PM
-                      </button>
-                      <button class="screen-time" onclick="timeFunction()">
-                        1:00 PM
-                      </button>
-                      <button class="screen-time" onclick="timeFunction()">
-                        3:00 PM
-                      </button>
-                    </div>
-                  </li>
-
-                </ul>
+                <div id="showtime-status" class="showtime-status">Loading showtimes from database...</div>
+                <ul class="time-ul" id="showtime-list"></ul>
+                <input type="hidden" id="selected-show-id">
+                <input type="hidden" id="selected-room-no">
+                <input type="hidden" id="selected-theater-id">
               </div>
               <input id="screen-next-btn" type="button" name="next-step" class="next-step" value="Continue Booking"
                 disabled />
             </fieldset>
             <fieldset>
-
-              <div>
-                <iframe id="seat-sel-iframe"
-                  style="  box-shadow: 0 14px 12px 0 var(--theme-border), 0 10px 50px 0 var(--theme-border); width: 800px; height: 550px; display: block; margin-left: auto; margin-right: auto;"
-                  src="seat_selection/seat_sel.html"></iframe>
+              <div class="seat-panel">
+                <h2>Seat Selection</h2>
+                <div class="screen-label">SCREEN</div>
+                <div id="seat-status" class="seat-status">Please select a showtime first.</div>
+                <div id="seat-map" class="seat-map"></div>
+                <p id="selected-seat-text" class="seat-status">Selected seats: None</p>
+                <input type="hidden" id="selected-seats">
+                <div class="seat-legend">
+                  <span><i class="legend-box legend-available"></i>Available</span>
+                  <span><i class="legend-box legend-selected"></i>Selected</span>
+                  <span><i class="legend-box legend-booked"></i>Booked</span>
+                  <span><i class="legend-box legend-broken"></i>Broken</span>
+                </div>
               </div>
               <br>
-              <input type="button" name="next-step" class="next-step" value="Proceed to Payment" />
+              <input id="seat-next-btn" type="button" name="next-step" class="next-step" value="Proceed to Payment" disabled />
               <input type="button" name="previous-step" class="previous-step" value="Back" />
             </fieldset>
             <fieldset>
@@ -273,7 +368,7 @@
                   </div>
                 </div>
               </div>
-              <input type="button" name="next-step" class="next-step pay-btn" value="Confirm Payment" />
+              <input id="confirm-pay-btn" type="button" name="next-step" class="next-step pay-btn" value="Confirm Payment" />
               <input type="button" name="previous-step" class="cancel-pay-btn" value="Cancel Payment"
                 onclick="location.href='index.html';" />
             </fieldset>
@@ -284,7 +379,7 @@
                   <div class="holes-top"></div>
                   <div class="title">
                     <p class="cinema">Entertainment</p>
-                    <p class="movie-title">Movie Name</p>
+                    <p class="movie-title" id="ticket-movie-title">Movie Name</p>
                   </div>
                   <div class="poster">
                     <img src="https://s3-us-west-2.amazonaws.com/s.cdpn.io/25240/only-god-forgives.jpg"
@@ -298,9 +393,9 @@
                         <th>SEAT</th>
                       </tr>
                       <tr>
-                        <td class="bigger">18</td>
-                        <td class="bigger">H</td>
-                        <td class="bigger">24</td>
+                        <td class="bigger" id="ticket-room">-</td>
+                        <td class="bigger" id="ticket-row">-</td>
+                        <td class="bigger" id="ticket-seat">-</td>
                       </tr>
                     </table>
                     <table class="info-table ticket-table">
@@ -310,9 +405,9 @@
                         <th>TIME</th>
                       </tr>
                       <tr>
-                        <td>RS.12.00</td>
-                        <td>4/13/21</td>
-                        <td>19:30</td>
+                        <td id="ticket-price">-</td>
+                        <td id="ticket-date">-</td>
+                        <td id="ticket-time">-</td>
                       </tr>
                     </table>
                   </div>
@@ -477,10 +572,347 @@
   </div>
 </body>
 <script>
+  const API_BASE_URL =
+  window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
+    ? "http://localhost:3000"
+    : "";
   let prevId = "1";
+  let selectedShowtime = null;
+  let selectedSeats = [];
+  let currentBooking = null;
 
-  window.onload = function () {
-    document.getElementById("screen-next-btn").disabled = true;
+  window.addEventListener("load", function () {
+    const screenNextBtn = document.getElementById("screen-next-btn");
+    const seatNextBtn = document.getElementById("seat-next-btn");
+    const confirmPayBtn = document.getElementById("confirm-pay-btn");
+
+    screenNextBtn.disabled = true;
+    showFieldset(0);
+    loadShowtimes();
+
+    screenNextBtn.addEventListener("click", function (event) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+
+      if (!selectedShowtime) {
+        document.getElementById("showtime-status").textContent = "Please select a showtime first.";
+        return;
+      }
+
+      loadSeats(selectedShowtime.ShowID);
+      goToSeatStep();
+    }, true);
+
+    seatNextBtn.addEventListener("click", async function (event) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      await createBooking();
+    }, true);
+
+    confirmPayBtn.addEventListener("click", async function (event) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      await confirmPayment();
+    }, true);
+  });
+
+  function showFieldset(index) {
+    const fieldsets = document.querySelectorAll("#form fieldset");
+    fieldsets.forEach((fieldset, i) => {
+      fieldset.style.display = i === index ? "block" : "none";
+    });
+  }
+
+  function activateStep(stepId) {
+    const step = document.getElementById(stepId);
+    step.classList.add("active");
+    step.classList.remove("not_active");
+  }
+
+  function goToSeatStep() {
+    showFieldset(1);
+    activateStep("step2");
+  }
+
+  function goToPaymentStep() {
+    showFieldset(2);
+    activateStep("step3");
+  }
+
+  function goToETicketStep() {
+    showFieldset(3);
+    activateStep("step4");
+  }
+
+  function formatDateTime(value) {
+    const date = new Date(value);
+    return date.toLocaleString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+  }
+
+  async function readJsonResponse(response, fallbackMessage) {
+    const contentType = response.headers.get("content-type") || "";
+
+    if (!contentType.includes("application/json")) {
+      const text = await response.text();
+      console.error("Non-JSON response from backend:", text);
+      throw new Error(fallbackMessage || "Backend did not return JSON. Please check the server route and restart Node.js.");
+    }
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.message || fallbackMessage || "Request failed.");
+    }
+
+    return data;
+  }
+
+  async function loadShowtimes() {
+    const status = document.getElementById("showtime-status");
+    const list = document.getElementById("showtime-list");
+
+    try {
+      status.textContent = "Loading showtimes from database...";
+      const response = await fetch(`${API_BASE_URL}/api/showtimes`);
+      const showtimes = await readJsonResponse(response, "Cannot load showtimes. Please check whether the backend is running.");
+      renderShowtimes(showtimes);
+    } catch (error) {
+      console.error(error);
+      status.textContent = error.message;
+      list.innerHTML = "";
+    }
+  }
+
+  function renderShowtimes(showtimes) {
+    const status = document.getElementById("showtime-status");
+    const list = document.getElementById("showtime-list");
+    list.innerHTML = "";
+
+    if (!showtimes || showtimes.length === 0) {
+      status.textContent = "No available showtimes.";
+      document.getElementById("screen-next-btn").disabled = true;
+      return;
+    }
+
+    status.textContent = `${showtimes.length} showtimes available. Please select one showtime to continue.`;
+
+    showtimes.forEach((show) => {
+      const item = document.createElement("li");
+      item.className = "time-li dynamic-showtime-li";
+
+      item.innerHTML = `
+        <div class="screens">
+          ${show.MovieTitle}
+          <small>${show.TheaterName} - ${show.RoomName}</small>
+        </div>
+        <div class="time-btn">
+          <button type="button" class="screen-time">
+            ${formatDateTime(show.Start_datetime)}
+          </button>
+        </div>
+      `;
+
+      const button = item.querySelector(".screen-time");
+
+      button.addEventListener("click", function () {
+        selectedShowtime = show;
+
+        document.getElementById("selected-show-id").value = show.ShowID;
+        document.getElementById("selected-room-no").value = show.RoomNo;
+        document.getElementById("selected-theater-id").value = show.TheaterID;
+
+        document.querySelectorAll(".screen-time").forEach(btn => {
+          btn.classList.remove("selected");
+        });
+
+        button.classList.add("selected");
+        document.getElementById("screen-next-btn").disabled = false;
+
+        status.textContent = `Selected: ${show.MovieTitle} at ${formatDateTime(show.Start_datetime)}.`;
+      });
+
+      list.appendChild(item);
+    });
+  }
+
+  async function loadSeats(showId) {
+    const status = document.getElementById("seat-status");
+    const seatMap = document.getElementById("seat-map");
+
+    selectedSeats = [];
+    document.getElementById("selected-seats").value = "";
+    document.getElementById("selected-seat-text").textContent = "Selected seats: None";
+    document.getElementById("seat-next-btn").disabled = true;
+    seatMap.innerHTML = "";
+
+    try {
+      status.textContent = "Loading seats from database...";
+      const response = await fetch(`${API_BASE_URL}/api/showtimes/${showId}/seats`);
+      const seats = await readJsonResponse(response, "Cannot load seats. Please check whether the backend is running.");
+      renderSeats(seats);
+    } catch (error) {
+      console.error(error);
+      status.textContent = error.message;
+    }
+  }
+
+  function renderSeats(seats) {
+    const status = document.getElementById("seat-status");
+    const seatMap = document.getElementById("seat-map");
+    seatMap.innerHTML = "";
+
+    if (!seats || seats.length === 0) {
+      status.textContent = "No seats found for this showtime.";
+      return;
+    }
+
+    status.textContent = "Choose one or more available seats.";
+
+    seats.forEach((seat) => {
+      const seatStatus = seat.SeatStatus || "available";
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = `seat-btn ${seatStatus}`;
+      button.textContent = seat.SeatID;
+      button.title = `${seat.SeatID} - ${seat.Seat_type || "Seat"} - ${seatStatus}`;
+
+      if (seatStatus !== "available") {
+        button.disabled = true;
+      }
+
+      button.addEventListener("click", function () {
+        if (selectedSeats.includes(seat.SeatID)) {
+          selectedSeats = selectedSeats.filter(id => id !== seat.SeatID);
+          button.classList.remove("selected");
+        } else {
+          selectedSeats.push(seat.SeatID);
+          button.classList.add("selected");
+        }
+
+        updateSelectedSeatsText();
+      });
+
+      seatMap.appendChild(button);
+    });
+  }
+
+  function updateSelectedSeatsText() {
+    document.getElementById("selected-seats").value = selectedSeats.join(",");
+    document.getElementById("selected-seat-text").textContent = selectedSeats.length > 0
+      ? `Selected seats: ${selectedSeats.join(", ")}`
+      : "Selected seats: None";
+    document.getElementById("seat-next-btn").disabled = selectedSeats.length === 0;
+  }
+
+  async function createBooking() {
+    const status = document.getElementById("seat-status");
+    const seatNextBtn = document.getElementById("seat-next-btn");
+
+    if (!selectedShowtime) {
+      status.textContent = "Please select a showtime first.";
+      return;
+    }
+
+    if (!selectedSeats || selectedSeats.length === 0) {
+      status.textContent = "Please select at least one seat.";
+      return;
+    }
+
+    try {
+      seatNextBtn.disabled = true;
+      status.textContent = "Creating booking...";
+
+      const response = await fetch(`${API_BASE_URL}/api/bookings`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customerId: "U001",
+          showId: selectedShowtime.ShowID,
+          seats: selectedSeats,
+          discountCode: null
+        })
+      });
+
+      const result = await readJsonResponse(response, "Cannot create booking.");
+      currentBooking = result.booking;
+
+      status.textContent =
+        `Booking created successfully. Booking ID: ${currentBooking.BookingID}. Total: ${Number(currentBooking.Total_price).toLocaleString("vi-VN")} VND.`;
+
+      goToPaymentStep();
+    } catch (error) {
+      console.error(error);
+      status.textContent = error.message;
+      seatNextBtn.disabled = false;
+    }
+  }
+
+  async function confirmPayment() {
+    const payBtn = document.getElementById("confirm-pay-btn");
+
+    if (!currentBooking || !currentBooking.BookingID) {
+      alert("No booking found. Please create a booking first.");
+      return;
+    }
+
+    try {
+      payBtn.disabled = true;
+      payBtn.value = "Processing Payment...";
+
+      const response = await fetch(`${API_BASE_URL}/api/bookings/${currentBooking.BookingID}/pay`, {
+        method: "PUT"
+      });
+
+      const result = await readJsonResponse(response, "Cannot confirm payment.");
+      currentBooking = result.booking;
+
+      await loadETicket();
+      goToETicketStep();
+      payBtn.value = "Payment Confirmed";
+    } catch (error) {
+      console.error(error);
+      alert(error.message);
+      payBtn.disabled = false;
+      payBtn.value = "Confirm Payment";
+    }
+  }
+
+  async function loadETicket() {
+    if (!currentBooking || !currentBooking.BookingID) {
+      throw new Error("No booking found for e-ticket.");
+    }
+
+    const response = await fetch(`${API_BASE_URL}/api/bookings/${currentBooking.BookingID}/ticket`);
+    const ticket = await readJsonResponse(response, "Cannot load e-ticket. Check the /api/bookings/:bookingId/ticket route and restart the backend.");
+
+    const showDate = new Date(ticket.showTime);
+
+    document.getElementById("ticket-movie-title").textContent = ticket.movieTitle;
+    document.getElementById("ticket-room").textContent = ticket.roomNo;
+
+    const seatList = ticket.seats.join(", ");
+    const rowList = [...new Set(ticket.seats.map(seat => seat.charAt(0)))].join(", ");
+
+    document.getElementById("ticket-row").textContent = rowList;
+    document.getElementById("ticket-seat").textContent = seatList;
+
+    document.getElementById("ticket-price").textContent =
+      `${Number(ticket.totalPrice).toLocaleString("vi-VN")} VND`;
+
+    document.getElementById("ticket-date").textContent =
+      showDate.toLocaleDateString("en-GB");
+
+    document.getElementById("ticket-time").textContent =
+      showDate.toLocaleTimeString("en-GB", {
+        hour: "2-digit",
+        minute: "2-digit"
+      });
   }
 
   function timeFunction() {

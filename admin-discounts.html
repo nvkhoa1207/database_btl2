@@ -400,6 +400,9 @@
             <li class="nav-item"><a class="nav-link" href="about.html">About</a></li>
             <li class="nav-item"><a class="nav-link" href="Contact_Us.html">Contact</a></li>
             <li class="nav-item active"><a class="nav-link" href="admin-discounts.html">Admin</a></li>
+            <li class="nav-item">
+							<a class="nav-link" href="ticket-booking.html">Booking</a>
+						  </li>
           </ul>
 
           <div class="search-right">
@@ -619,7 +622,10 @@
   <script src="assets/js/bootstrap.min.js"></script>
 
   <script>
-    const API_URL = "http://localhost:3000/api";
+    const API_URL =
+  window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
+    ? "http://localhost:3000/api"
+    : "/api";
     let reportData = [];
     let sortDirection = 1;
 
