@@ -14,11 +14,81 @@ function getSqlError(error) {
   return error.sqlMessage || error.message || "Database error";
 }
 
+const SAMPLE_TABLES = [
+  "ADMIN",
+  "BOOKING",
+  "CREDIT_CARD",
+  "CUSTOMER",
+  "DISCOUNT",
+  "E_WALLET",
+  "GIFT_CARD",
+  "MOVIE",
+  "MOVIE_GENRE",
+  "OPERATOR",
+  "PAYMENT_METHOD",
+  "ROOM",
+  "SEAT",
+  "SHOWTIME",
+  "STAFF",
+  "THEATER",
+  "THEATER_HOTLINE",
+  "TICKET",
+  "USER",
+  "WORK_AT",
+];
+
+function findSampleTable(tableName) {
+  const normalizedName = String(tableName || "").trim().toUpperCase();
+  return SAMPLE_TABLES.find((table) => table === normalizedName);
+}
+
 // 1. Test database connection
 app.get("/api/test", async (req, res) => {
   try {
     const [rows] = await pool.query("SELECT 1 AS ok");
     res.json(rows[0]);
+  } catch (error) {
+    res.status(500).json({ message: getSqlError(error) });
+  }
+});
+
+// Read-only sample data browser for reports/demo tools such as Excel Power Query.
+app.get("/api/tables", async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `
+      SELECT TABLE_NAME AS tableName, TABLE_ROWS AS estimatedRows
+      FROM INFORMATION_SCHEMA.TABLES
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME IN (?)
+      ORDER BY TABLE_NAME
+      `,
+      [SAMPLE_TABLES]
+    );
+
+    res.json(rows);
+  } catch (error) {
+    res.status(500).json({ message: getSqlError(error) });
+  }
+});
+
+app.get("/api/tables/:tableName", async (req, res) => {
+  try {
+    const tableName = findSampleTable(req.params.tableName);
+
+    if (!tableName) {
+      return res.status(404).json({
+        message: "Table is not available through the sample data API.",
+      });
+    }
+
+    const limit = Math.min(Math.max(Number(req.query.limit || 100), 1), 500);
+    const [rows] = await pool.query("SELECT * FROM ?? LIMIT ?", [
+      tableName,
+      limit,
+    ]);
+
+    res.json(rows);
   } catch (error) {
     res.status(500).json({ message: getSqlError(error) });
   }
