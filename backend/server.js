@@ -181,11 +181,40 @@ app.get("/api/showtimes", async (req, res) => {
         m.Title AS MovieTitle,
         m.Age_restriction,
         t.Name AS TheaterName,
-        r.Name AS RoomName
+        r.Name AS RoomName,
+        r.Capacity AS RoomCapacity,
+        COALESCE(seat_counts.TotalSeats, 0) AS TotalSeats,
+        GREATEST(
+          COALESCE(seat_counts.AvailableSeats, 0) - COALESCE(ticket_counts.BookedSeats, 0),
+          0
+        ) AS AvailableSeats
       FROM SHOWTIME s
       JOIN MOVIE m ON m.MovieID = s.MovieID
       JOIN THEATER t ON t.TheaterID = s.TheaterID
       JOIN ROOM r ON r.RoomNo = s.RoomNo AND r.TheaterID = s.TheaterID
+      LEFT JOIN (
+        SELECT
+          RoomNo,
+          TheaterID,
+          COUNT(*) AS TotalSeats,
+          SUM(CASE WHEN \`Condition\` = 'usable' THEN 1 ELSE 0 END) AS AvailableSeats
+        FROM SEAT
+        GROUP BY RoomNo, TheaterID
+      ) seat_counts
+        ON seat_counts.RoomNo = s.RoomNo
+       AND seat_counts.TheaterID = s.TheaterID
+      LEFT JOIN (
+        SELECT
+          ShowID,
+          RoomNo,
+          TheaterID,
+          COUNT(*) AS BookedSeats
+        FROM TICKET
+        GROUP BY ShowID, RoomNo, TheaterID
+      ) ticket_counts
+        ON ticket_counts.ShowID = s.ShowID
+       AND ticket_counts.RoomNo = s.RoomNo
+       AND ticket_counts.TheaterID = s.TheaterID
       WHERE s.Status IN ('scheduled', 'open')
       ORDER BY s.Start_datetime;
     `);
@@ -212,6 +241,7 @@ app.get("/api/showtimes/:showId/seats", async (req, res) => {
         se.Condition,
         CASE
           WHEN se.Condition = 'broken' THEN 'broken'
+          WHEN se.Condition = 'reserved' THEN 'reserved'
           WHEN tk.TicketNo IS NOT NULL THEN 'booked'
           ELSE 'available'
         END AS SeatStatus
@@ -225,7 +255,10 @@ app.get("/api/showtimes/:showId/seats", async (req, res) => {
        AND tk.TheaterID = se.TheaterID
        AND tk.ShowID = sh.ShowID
       WHERE sh.ShowID = ?
-      ORDER BY se.SeatID;
+      ORDER BY
+        LEFT(se.SeatID, 1),
+        CAST(SUBSTRING(se.SeatID, 2) AS UNSIGNED),
+        se.SeatID;
       `,
       [showId]
     );
@@ -250,14 +283,16 @@ function makeId(prefix, length = 6) {
 
 function getPriceBySeatType(seatType) {
   if (seatType === "VIP") return 120000;
-  if (seatType === "Sweetbox") return 150000;
+  if (seatType === "Sweetbox") return 160000;
   return 90000;
 }
 
 app.post("/api/bookings", async (req, res) => {
-  const conn = await db.getConnection();
+  let conn;
 
   try {
+    conn = await db.getConnection();
+
     const {
       customerId = "U001",
       showId,
@@ -376,9 +411,22 @@ app.post("/api/bookings", async (req, res) => {
 
     const [[booking]] = await conn.query(
       `
-      SELECT BookingID, CustomerID, PaymentID, DiscountCode, Status, Total_price
-      FROM BOOKING
-      WHERE BookingID = ?
+      SELECT
+        b.BookingID,
+        b.CustomerID,
+        b.PaymentID,
+        b.DiscountCode,
+        b.Status,
+        b.Total_price,
+        COALESCE((
+          SELECT SUM(t.Price)
+          FROM TICKET t
+          WHERE t.BookingID = b.BookingID
+        ), 0) AS TicketSubtotal,
+        COALESCE(d.Discount_value, 0) AS DiscountValue
+      FROM BOOKING b
+      LEFT JOIN DISCOUNT d ON d.DiscountCode = b.DiscountCode
+      WHERE b.BookingID = ?
       `,
       [bookingId]
     );
@@ -390,20 +438,161 @@ app.post("/api/bookings", async (req, res) => {
       booking
     });
   } catch (err) {
-    await conn.rollback();
+    if (conn) {
+      await conn.rollback();
+    }
 
     res.status(400).json({
       message: err.sqlMessage || err.message
     });
   } finally {
-    conn.release();
+    if (conn) {
+      conn.release();
+    }
+  }
+});
+
+app.put("/api/bookings/:bookingId/discount", async (req, res) => {
+  let conn;
+
+  try {
+    conn = await db.getConnection();
+
+    const { bookingId } = req.params;
+    const rawDiscountCode = req.body.discountCode;
+    const discountCode =
+      typeof rawDiscountCode === "string" && rawDiscountCode.trim() !== ""
+        ? rawDiscountCode.trim().toUpperCase()
+        : null;
+
+    await conn.beginTransaction();
+
+    const [[booking]] = await conn.query(
+      `
+      SELECT BookingID, PaymentID, Status
+      FROM BOOKING
+      WHERE BookingID = ?
+      FOR UPDATE
+      `,
+      [bookingId]
+    );
+
+    if (!booking) {
+      throw new Error("Booking does not exist.");
+    }
+
+    if (booking.Status === "Paid") {
+      throw new Error("Cannot change discount after payment.");
+    }
+
+    const [[subtotalRow]] = await conn.query(
+      `
+      SELECT COALESCE(SUM(Price), 0) AS TicketSubtotal
+      FROM TICKET
+      WHERE BookingID = ?
+      `,
+      [bookingId]
+    );
+
+    const ticketSubtotal = Number(subtotalRow.TicketSubtotal || 0);
+    let discountValue = 0;
+    let appliedDiscountCode = null;
+    let discountName = null;
+
+    if (discountCode) {
+      const [[discount]] = await conn.query(
+        `
+        SELECT DiscountCode, Name, Discount_value, Expiry_date
+        FROM DISCOUNT
+        WHERE DiscountCode = ?
+        `,
+        [discountCode]
+      );
+
+      if (!discount) {
+        throw new Error("Discount code is invalid.");
+      }
+
+      if (new Date(discount.Expiry_date) < new Date(new Date().toDateString())) {
+        throw new Error("Discount code has expired.");
+      }
+
+      discountValue = Number(discount.Discount_value || 0);
+      appliedDiscountCode = discount.DiscountCode;
+      discountName = discount.Name;
+    }
+
+    const totalPrice = Math.max(ticketSubtotal - discountValue, 0);
+
+    await conn.query(
+      `
+      UPDATE BOOKING
+      SET DiscountCode = ?,
+          Total_price = ?
+      WHERE BookingID = ?
+      `,
+      [appliedDiscountCode, totalPrice, bookingId]
+    );
+
+    if (booking.PaymentID) {
+      await conn.query(
+        `
+        UPDATE PAYMENT_METHOD
+        SET Amount = ?
+        WHERE PaymentID = ?
+          AND Status = 'Pending'
+        `,
+        [totalPrice, booking.PaymentID]
+      );
+    }
+
+    const [[updatedBooking]] = await conn.query(
+      `
+      SELECT
+        b.BookingID,
+        b.CustomerID,
+        b.PaymentID,
+        b.DiscountCode,
+        b.Status,
+        b.Total_price,
+        ? AS TicketSubtotal,
+        ? AS DiscountValue,
+        ? AS DiscountName
+      FROM BOOKING b
+      WHERE b.BookingID = ?
+      `,
+      [ticketSubtotal, discountValue, discountName, bookingId]
+    );
+
+    await conn.commit();
+
+    res.json({
+      message: appliedDiscountCode
+        ? "Discount applied successfully."
+        : "Discount removed successfully.",
+      booking: updatedBooking
+    });
+  } catch (err) {
+    if (conn) {
+      await conn.rollback();
+    }
+
+    res.status(400).json({
+      message: err.sqlMessage || err.message
+    });
+  } finally {
+    if (conn) {
+      conn.release();
+    }
   }
 });
 
 app.put("/api/bookings/:bookingId/pay", async (req, res) => {
-  const conn = await db.getConnection();
+  let conn;
 
   try {
+    conn = await db.getConnection();
+
     const { bookingId } = req.params;
 
     await conn.beginTransaction();
@@ -458,7 +647,8 @@ app.put("/api/bookings/:bookingId/pay", async (req, res) => {
         b.Status,
         b.Total_price,
         pm.Status AS PaymentStatus,
-        pm.Amount AS PaymentAmount
+        pm.Amount AS PaymentAmount,
+        b.DiscountCode
       FROM BOOKING b
       JOIN PAYMENT_METHOD pm ON pm.PaymentID = b.PaymentID
       WHERE b.BookingID = ?
@@ -473,13 +663,17 @@ app.put("/api/bookings/:bookingId/pay", async (req, res) => {
       booking: updatedBooking
     });
   } catch (err) {
-    await conn.rollback();
+    if (conn) {
+      await conn.rollback();
+    }
 
     res.status(400).json({
       message: err.sqlMessage || err.message
     });
   } finally {
-    conn.release();
+    if (conn) {
+      conn.release();
+    }
   }
 });
 const port = process.env.PORT || 3000;
@@ -503,12 +697,18 @@ app.get("/api/bookings/:bookingId/ticket", async (req, res) => {
         s.ShowID,
         s.Start_datetime,
         m.Title AS MovieTitle,
-        th.Name AS TheaterName
+        th.Name AS TheaterName,
+        r.Name AS RoomName,
+        b.DiscountCode,
+        COALESCE(d.Name, '') AS DiscountName,
+        COALESCE(d.Discount_value, 0) AS DiscountValue
       FROM BOOKING b
       JOIN TICKET tk ON tk.BookingID = b.BookingID
       JOIN SHOWTIME s ON s.ShowID = tk.ShowID
       JOIN MOVIE m ON m.MovieID = s.MovieID
       JOIN THEATER th ON th.TheaterID = tk.TheaterID
+      JOIN ROOM r ON r.RoomNo = tk.RoomNo AND r.TheaterID = tk.TheaterID
+      LEFT JOIN DISCOUNT d ON d.DiscountCode = b.DiscountCode
       WHERE b.BookingID = ?
       ORDER BY tk.SeatID;
       `,
@@ -528,6 +728,10 @@ app.get("/api/bookings/:bookingId/ticket", async (req, res) => {
       movieTitle: rows[0].MovieTitle,
       theaterName: rows[0].TheaterName,
       roomNo: rows[0].RoomNo,
+      roomName: rows[0].RoomName,
+      discountCode: rows[0].DiscountCode,
+      discountName: rows[0].DiscountName,
+      discountValue: rows[0].DiscountValue,
       showTime: rows[0].Start_datetime,
       seats: rows.map(row => row.SeatID),
       tickets: rows

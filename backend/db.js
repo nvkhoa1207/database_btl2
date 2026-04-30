@@ -1,5 +1,20 @@
 const mysql = require("mysql2/promise");
-require("dotenv").config();
+const path = require("path");
+const dotenv = require("dotenv");
+
+dotenv.config({ path: path.join(__dirname, "..", ".env") });
+dotenv.config({ path: path.join(__dirname, ".env") });
+
+const requiredEnv = ["DB_USER", "DB_NAME"];
+const missingEnv = requiredEnv.filter((name) => !process.env[name]);
+
+if (missingEnv.length > 0) {
+  throw new Error(
+    `Missing database config: ${missingEnv.join(
+      ", "
+    )}. Create .env in the project root or backend/.env with your MySQL settings.`
+  );
+}
 
 const sslConfig =
   process.env.DB_SSL === "true"
@@ -7,7 +22,7 @@ const sslConfig =
     : undefined;
 
 const pool = mysql.createPool({
-  host: process.env.DB_HOST,
+  host: process.env.DB_HOST || "localhost",
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
