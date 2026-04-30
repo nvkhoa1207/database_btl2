@@ -1222,6 +1222,32 @@
     return nextDate;
   }
 
+  function getUniqueShowDateInfos(showtimes) {
+    const datesByKey = new Map();
+
+    showtimes
+      .slice()
+      .sort(compareShowtimes)
+      .forEach((show) => {
+        const date = getDateStart(show.Start_datetime);
+        const key = getLocalDateKey(date);
+
+        if (!datesByKey.has(key)) {
+          datesByKey.set(key, {
+            key,
+            date
+          });
+        }
+      });
+
+    return [...datesByKey.values()];
+  }
+
+  function getInitialDateKey(showtimes) {
+    const dateInfos = getUniqueShowDateInfos(showtimes);
+    return dateInfos.length > 0 ? dateInfos[0].key : null;
+  }
+
   function getWeekdayLabel(date) {
     return ["CN", "T2", "T3", "T4", "T5", "T6", "T7"][date.getDay()];
   }
@@ -1374,8 +1400,8 @@
       status.classList.remove("is-hidden");
       const response = await fetch(`${API_BASE_URL}/api/showtimes`);
       const showtimes = await readJsonResponse(response, "Cannot load showtimes. Please check whether the backend is running.");
-      allShowtimes = showtimes || [];
-      selectedDateKey = allShowtimes.length > 0 ? getLocalDateKey(allShowtimes[0].Start_datetime) : null;
+      allShowtimes = (showtimes || []).slice().sort(compareShowtimes);
+      selectedDateKey = getInitialDateKey(allShowtimes);
       renderShowDateCarousel(allShowtimes);
       renderShowtimes(allShowtimes);
     } catch (error) {
@@ -1395,18 +1421,7 @@
       return;
     }
 
-    const firstDate = showtimes
-      .map(show => getDateStart(show.Start_datetime))
-      .sort((first, second) => first.getTime() - second.getTime())[0];
-
-    const dateInfos = Array.from({ length: 7 }, (_, index) => {
-      const date = addDays(firstDate, index);
-
-      return {
-        key: getLocalDateKey(date),
-        date
-      };
-    });
+    const dateInfos = getUniqueShowDateInfos(showtimes);
 
     dateInfos.forEach((dateInfo) => {
       const cell = document.createElement("button");
@@ -1469,6 +1484,13 @@
     const filteredShowtimes = selectedTheaterKey && selectedTheaterKey !== "all"
       ? dateShowtimes.filter(show => getTheaterKey(show) === selectedTheaterKey)
       : dateShowtimes;
+
+    if (filteredShowtimes.length === 0) {
+      status.textContent = "No available showtimes for this theater.";
+      status.classList.remove("is-hidden");
+      document.getElementById("screen-next-btn").disabled = true;
+      return;
+    }
 
     status.textContent = "";
     status.classList.add("is-hidden");

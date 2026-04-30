@@ -65,6 +65,167 @@ function findSampleTable(tableName) {
   return SAMPLE_TABLES.find((table) => table === normalizedName);
 }
 
+const DEMO_AUTO_DATES = process.env.DEMO_AUTO_DATES !== "false";
+const DEMO_FIRST_SHOW_OFFSET_DAYS = Number(
+  process.env.DEMO_FIRST_SHOW_OFFSET_DAYS || 1
+);
+const DEMO_TEMP_SHIFT_DAYS = 3650;
+const DEMO_DATE_LOCK = "ticket4u:demo_schedule_dates";
+
+async function shiftShowtimesByDays(conn, dayShift) {
+  if (!Number.isFinite(dayShift) || dayShift === 0) return;
+
+  await conn.query(
+    `
+    UPDATE SHOWTIME
+    SET Start_datetime = DATE_ADD(Start_datetime, INTERVAL ? DAY),
+        End_datetime = DATE_ADD(End_datetime, INTERVAL ? DAY)
+    `,
+    [dayShift, dayShift]
+  );
+}
+
+async function refreshDemoBookingDates(conn) {
+  await conn.query(`
+    UPDATE BOOKING b
+    JOIN (
+      SELECT
+        tk.BookingID,
+        MIN(s.Start_datetime) AS FirstShowStart
+      FROM TICKET tk
+      JOIN SHOWTIME s ON s.ShowID = tk.ShowID
+      GROUP BY tk.BookingID
+    ) first_show ON first_show.BookingID = b.BookingID
+    SET
+      b.Booking_date = DATE_ADD(
+        DATE_SUB(first_show.FirstShowStart, INTERVAL 2 DAY),
+        INTERVAL (MOD(CAST(SUBSTRING(b.BookingID, 2) AS UNSIGNED), 18) * 5) MINUTE
+      ),
+      b.Expired_time = DATE_ADD(
+        DATE_ADD(
+          DATE_SUB(first_show.FirstShowStart, INTERVAL 2 DAY),
+          INTERVAL (MOD(CAST(SUBSTRING(b.BookingID, 2) AS UNSIGNED), 18) * 5) MINUTE
+        ),
+        INTERVAL 15 MINUTE
+      )
+    WHERE b.BookingID REGEXP '^B[0-9]+$'
+      AND CAST(SUBSTRING(b.BookingID, 2) AS UNSIGNED) <= 50
+  `);
+}
+
+async function refreshDemoExpirations(conn) {
+  await conn.query(`
+    UPDATE DISCOUNT
+    SET Expiry_date = DATE_ADD(CURDATE(), INTERVAL 1 YEAR)
+    WHERE Expiry_date < DATE_ADD(CURDATE(), INTERVAL 1 YEAR)
+  `);
+
+  await conn.query(`
+    UPDATE GIFT_CARD
+    SET Expiry_date = DATE_ADD(CURDATE(), INTERVAL 1 YEAR)
+    WHERE Expiry_date < DATE_ADD(CURDATE(), INTERVAL 1 YEAR)
+  `);
+}
+
+async function ensureDemoScheduleDates(conn) {
+  if (!DEMO_AUTO_DATES) return;
+
+  const [[lockResult]] = await conn.query("SELECT GET_LOCK(?, 10) AS locked", [
+    DEMO_DATE_LOCK,
+  ]);
+
+  if (Number(lockResult.locked) !== 1) {
+    throw new Error("Unable to refresh demo schedule dates. Please try again.");
+  }
+
+  try {
+    const [[scheduleInfo]] = await conn.query(
+      `
+      SELECT
+        COUNT(*) AS ShowtimeCount,
+        DATEDIFF(
+          DATE_ADD(CURDATE(), INTERVAL ? DAY),
+          DATE(MIN(Start_datetime))
+        ) AS DayShift
+      FROM SHOWTIME
+      WHERE Status IN ('scheduled', 'open')
+      `,
+      [DEMO_FIRST_SHOW_OFFSET_DAYS]
+    );
+
+    const showtimeCount = Number(scheduleInfo?.ShowtimeCount || 0);
+    const dayShift = Number(scheduleInfo?.DayShift || 0);
+
+    if (showtimeCount > 0 && dayShift !== 0) {
+      await shiftShowtimesByDays(conn, DEMO_TEMP_SHIFT_DAYS);
+
+      const [[tempScheduleInfo]] = await conn.query(
+        `
+        SELECT DATEDIFF(
+          DATE_ADD(CURDATE(), INTERVAL ? DAY),
+          DATE(MIN(Start_datetime))
+        ) AS DayShift
+        FROM SHOWTIME
+        WHERE Status IN ('scheduled', 'open')
+        `,
+        [DEMO_FIRST_SHOW_OFFSET_DAYS]
+      );
+
+      await shiftShowtimesByDays(conn, Number(tempScheduleInfo?.DayShift || 0));
+      await refreshDemoBookingDates(conn);
+    }
+
+    await refreshDemoExpirations(conn);
+  } finally {
+    await conn.query("SELECT RELEASE_LOCK(?)", [DEMO_DATE_LOCK]).catch(() => {});
+  }
+}
+
+async function releaseExpiredPendingBookings(conn) {
+  await conn.query(`
+    UPDATE PAYMENT_METHOD pm
+    JOIN BOOKING b ON b.PaymentID = pm.PaymentID
+    SET pm.Status = 'Failed'
+    WHERE b.Status = 'Pending'
+      AND b.Expired_time <= NOW()
+      AND pm.Status = 'Pending'
+  `);
+
+  await conn.query(`
+    DELETE tk
+    FROM TICKET tk
+    JOIN BOOKING b ON b.BookingID = tk.BookingID
+    WHERE b.Status = 'Pending'
+      AND b.Expired_time <= NOW()
+  `);
+
+  await conn.query(`
+    UPDATE BOOKING
+    SET Status = 'Cancelled'
+    WHERE Status = 'Pending'
+      AND Expired_time <= NOW()
+  `);
+}
+
+async function prepareDemoData(existingConn = null) {
+  let conn = existingConn;
+  let shouldRelease = false;
+
+  if (!conn) {
+    conn = await db.getConnection();
+    shouldRelease = true;
+  }
+
+  try {
+    await ensureDemoScheduleDates(conn);
+    await releaseExpiredPendingBookings(conn);
+  } finally {
+    if (shouldRelease) {
+      conn.release();
+    }
+  }
+}
+
 // 1. Test database connection
 app.get("/api/test", async (req, res) => {
   try {
@@ -107,6 +268,10 @@ app.get("/api/tables/:tableName", async (req, res) => {
 
     const limit = Math.min(Math.max(Number(req.query.limit || 100), 1), 500);
     const useLatestOrder = req.query.latest === "true";
+
+    if (["BOOKING", "DISCOUNT", "GIFT_CARD", "SHOWTIME", "TICKET"].includes(tableName)) {
+      await prepareDemoData();
+    }
 
     if (tableName === "TICKET" && useLatestOrder) {
       const [rows] = await pool.query(
@@ -341,6 +506,8 @@ app.get("/api/functions/customer-points/:customerId", async (req, res) => {
 
 app.get("/api/showtimes", async (req, res) => {
   try {
+    await prepareDemoData();
+
     const [rows] = await db.query(`
       SELECT
         s.ShowID,
@@ -375,17 +542,21 @@ app.get("/api/showtimes", async (req, res) => {
        AND seat_counts.TheaterID = s.TheaterID
       LEFT JOIN (
         SELECT
-          ShowID,
-          RoomNo,
-          TheaterID,
+          tk.ShowID,
+          tk.RoomNo,
+          tk.TheaterID,
           COUNT(*) AS BookedSeats
-        FROM TICKET
-        GROUP BY ShowID, RoomNo, TheaterID
+        FROM TICKET tk
+        JOIN BOOKING b ON b.BookingID = tk.BookingID
+        WHERE b.Status = 'Paid'
+           OR (b.Status = 'Pending' AND b.Expired_time > NOW())
+        GROUP BY tk.ShowID, tk.RoomNo, tk.TheaterID
       ) ticket_counts
         ON ticket_counts.ShowID = s.ShowID
        AND ticket_counts.RoomNo = s.RoomNo
        AND ticket_counts.TheaterID = s.TheaterID
       WHERE s.Status IN ('scheduled', 'open')
+        AND s.Start_datetime > NOW()
       ORDER BY s.Start_datetime;
     `);
 
@@ -403,6 +574,8 @@ app.get("/api/showtimes/:showId/seats", async (req, res) => {
   try {
     const { showId } = req.params;
 
+    await prepareDemoData();
+
     const [rows] = await db.query(
       `
       SELECT
@@ -412,19 +585,32 @@ app.get("/api/showtimes/:showId/seats", async (req, res) => {
         CASE
           WHEN se.Condition = 'broken' THEN 'broken'
           WHEN se.Condition = 'reserved' THEN 'reserved'
-          WHEN tk.TicketNo IS NOT NULL THEN 'booked'
+          WHEN active_tickets.TicketNo IS NOT NULL THEN 'booked'
           ELSE 'available'
         END AS SeatStatus
       FROM SHOWTIME sh
       JOIN SEAT se
         ON se.RoomNo = sh.RoomNo
        AND se.TheaterID = sh.TheaterID
-      LEFT JOIN TICKET tk
-        ON tk.SeatID = se.SeatID
-       AND tk.RoomNo = se.RoomNo
-       AND tk.TheaterID = se.TheaterID
-       AND tk.ShowID = sh.ShowID
+      LEFT JOIN (
+        SELECT
+          tk.TicketNo,
+          tk.SeatID,
+          tk.RoomNo,
+          tk.TheaterID,
+          tk.ShowID
+        FROM TICKET tk
+        JOIN BOOKING b ON b.BookingID = tk.BookingID
+        WHERE b.Status = 'Paid'
+           OR (b.Status = 'Pending' AND b.Expired_time > NOW())
+      ) active_tickets
+        ON active_tickets.SeatID = se.SeatID
+       AND active_tickets.RoomNo = se.RoomNo
+       AND active_tickets.TheaterID = se.TheaterID
+       AND active_tickets.ShowID = sh.ShowID
       WHERE sh.ShowID = ?
+        AND sh.Status IN ('scheduled', 'open')
+        AND sh.Start_datetime > NOW()
       ORDER BY
         LEFT(se.SeatID, 1),
         CAST(SUBSTRING(se.SeatID, 2) AS UNSIGNED),
@@ -443,12 +629,74 @@ app.get("/api/showtimes/:showId/seats", async (req, res) => {
   }
 });
 
-function makeId(prefix, length = 6) {
-  const randomPart = Math.floor(Math.random() * 10 ** length)
-    .toString()
-    .padStart(length, "0");
+async function acquireNamedLock(conn, lockName) {
+  const [[lockResult]] = await conn.query("SELECT GET_LOCK(?, 10) AS locked", [
+    lockName,
+  ]);
 
-  return `${prefix}${randomPart}`;
+  if (Number(lockResult.locked) !== 1) {
+    throw new Error("Unable to reserve the next ID. Please try again.");
+  }
+}
+
+async function releaseNamedLocks(conn, lockNames) {
+  for (const lockName of [...lockNames].reverse()) {
+    await conn.query("SELECT RELEASE_LOCK(?)", [lockName]);
+  }
+}
+
+async function getNextIds(
+  conn,
+  tableName,
+  columnName,
+  prefix,
+  count = 1,
+  minDigits = 3
+) {
+  const [rows] = await conn.query(
+    `
+    SELECT CAST(SUBSTRING(??, ?) AS UNSIGNED) AS idNumber
+    FROM ??
+    WHERE ?? REGEXP ?
+    ORDER BY idNumber
+    `,
+    [
+      columnName,
+      prefix.length + 1,
+      tableName,
+      columnName,
+      `^${prefix}[0-9]+$`,
+    ]
+  );
+
+  const usedNumbers = new Set(rows.map((row) => Number(row.idNumber)));
+  const ids = [];
+  let nextNumber = 1;
+
+  while (ids.length < count) {
+    if (!usedNumbers.has(nextNumber)) {
+      const digits = Math.max(minDigits, String(nextNumber).length);
+      ids.push(`${prefix}${String(nextNumber).padStart(digits, "0")}`);
+      usedNumbers.add(nextNumber);
+    }
+
+    nextNumber += 1;
+  }
+
+  return ids;
+}
+
+async function getNextId(conn, tableName, columnName, prefix, minDigits = 3) {
+  const [nextId] = await getNextIds(
+    conn,
+    tableName,
+    columnName,
+    prefix,
+    1,
+    minDigits
+  );
+
+  return nextId;
 }
 
 function getPriceBySeatType(seatType) {
@@ -459,6 +707,12 @@ function getPriceBySeatType(seatType) {
 
 app.post("/api/bookings", async (req, res) => {
   let conn;
+  const acquiredIdLocks = [];
+  const idLocks = [
+    "ticket4u:BOOKING.BookingID",
+    "ticket4u:PAYMENT_METHOD.PaymentID",
+    "ticket4u:TICKET.TicketNo",
+  ];
 
   try {
     conn = await db.getConnection();
@@ -478,23 +732,44 @@ app.post("/api/bookings", async (req, res) => {
       return res.status(400).json({ message: "At least one seat must be selected." });
     }
 
+    await prepareDemoData(conn);
     await conn.beginTransaction();
+
+    for (const lockName of idLocks) {
+      await acquireNamedLock(conn, lockName);
+      acquiredIdLocks.push(lockName);
+    }
 
     const [[showtime]] = await conn.query(
       `
-      SELECT ShowID, RoomNo, TheaterID
+      SELECT ShowID, RoomNo, TheaterID, Start_datetime
       FROM SHOWTIME
       WHERE ShowID = ?
+        AND Status IN ('scheduled', 'open')
+        AND Start_datetime > NOW()
       `,
       [showId]
     );
 
     if (!showtime) {
-      throw new Error("Invalid showtime.");
+      throw new Error("Showtime is not available for booking.");
     }
 
-    const bookingId = makeId("B");
-    const paymentId = makeId("P");
+    const bookingId = await getNextId(conn, "BOOKING", "BookingID", "B");
+    const paymentId = await getNextId(
+      conn,
+      "PAYMENT_METHOD",
+      "PaymentID",
+      "P"
+    );
+    const ticketNos = await getNextIds(
+      conn,
+      "TICKET",
+      "TicketNo",
+      "TK",
+      seats.length
+    );
+    let ticketIndex = 0;
 
     await conn.query(
       `
@@ -540,12 +815,17 @@ app.post("/api/bookings", async (req, res) => {
 
       const [[existingTicket]] = await conn.query(
         `
-        SELECT TicketNo
-        FROM TICKET
-        WHERE SeatID = ?
-          AND RoomNo = ?
-          AND TheaterID = ?
-          AND ShowID = ?
+        SELECT tk.TicketNo
+        FROM TICKET tk
+        JOIN BOOKING b ON b.BookingID = tk.BookingID
+        WHERE tk.SeatID = ?
+          AND tk.RoomNo = ?
+          AND tk.TheaterID = ?
+          AND tk.ShowID = ?
+          AND (
+            b.Status = 'Paid'
+            OR (b.Status = 'Pending' AND b.Expired_time > NOW())
+          )
         `,
         [seatId, showtime.RoomNo, showtime.TheaterID, showId]
       );
@@ -554,8 +834,9 @@ app.post("/api/bookings", async (req, res) => {
         throw new Error(`Seat ${seatId} has already been booked.`);
       }
 
-      const ticketNo = makeId("TK", 6);
-      const qrCode = `QR-${bookingId}-${seatId}`;
+      const ticketNo = ticketNos[ticketIndex];
+      ticketIndex += 1;
+      const qrCode = `QR-${ticketNo}`;
       const price = getPriceBySeatType(seat.Seat_type);
 
       await conn.query(
@@ -617,6 +898,10 @@ app.post("/api/bookings", async (req, res) => {
     });
   } finally {
     if (conn) {
+      if (acquiredIdLocks.length > 0) {
+        await releaseNamedLocks(conn, acquiredIdLocks).catch(() => {});
+      }
+
       conn.release();
     }
   }
@@ -635,6 +920,7 @@ app.put("/api/bookings/:bookingId/discount", async (req, res) => {
         ? rawDiscountCode.trim().toUpperCase()
         : null;
 
+    await prepareDemoData(conn);
     await conn.beginTransaction();
 
     const [[booking]] = await conn.query(
@@ -653,6 +939,10 @@ app.put("/api/bookings/:bookingId/discount", async (req, res) => {
 
     if (booking.Status === "Paid") {
       throw new Error("Cannot change discount after payment.");
+    }
+
+    if (booking.Status === "Cancelled") {
+      throw new Error("Cannot change discount for a cancelled booking.");
     }
 
     const [[subtotalRow]] = await conn.query(
@@ -765,6 +1055,7 @@ app.put("/api/bookings/:bookingId/pay", async (req, res) => {
 
     const { bookingId } = req.params;
 
+    await prepareDemoData(conn);
     await conn.beginTransaction();
 
     const [[booking]] = await conn.query(
@@ -783,6 +1074,10 @@ app.put("/api/bookings/:bookingId/pay", async (req, res) => {
 
     if (booking.Status === "Paid") {
       throw new Error("This booking has already been paid.");
+    }
+
+    if (booking.Status === "Cancelled") {
+      throw new Error("This booking has expired or was cancelled. Please create a new booking.");
     }
 
     if (!booking.PaymentID) {
@@ -850,6 +1145,8 @@ const port = process.env.PORT || 3000;
 app.get("/api/bookings/:bookingId/ticket", async (req, res) => {
   try {
     const { bookingId } = req.params;
+
+    await prepareDemoData();
 
     const [rows] = await db.query(
       `

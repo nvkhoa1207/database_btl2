@@ -21,16 +21,29 @@ const sslConfig =
     ? { rejectUnauthorized: false }
     : undefined;
 
+const dbTimezone = process.env.DB_TIMEZONE || "+07:00";
+
 const pool = mysql.createPool({
   host: process.env.DB_HOST || "localhost",
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
   port: Number(process.env.DB_PORT || 3306),
+  timezone: dbTimezone,
+  dateStrings: true,
+  decimalNumbers: true,
   waitForConnections: true,
   connectionLimit: 2,
   queueLimit: 0,
   ssl: sslConfig,
+});
+
+pool.on("connection", (connection) => {
+  connection.query("SET time_zone = ?", [dbTimezone], (error) => {
+    if (error) {
+      console.error("Cannot set database timezone:", error.message);
+    }
+  });
 });
 
 module.exports = pool;
