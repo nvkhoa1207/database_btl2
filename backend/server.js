@@ -37,6 +37,29 @@ const SAMPLE_TABLES = [
   "WORK_AT",
 ];
 
+const SAMPLE_TABLE_ORDER = {
+  ADMIN: ["StaffID"],
+  BOOKING: ["Booking_date", "BookingID"],
+  CREDIT_CARD: ["PaymentID"],
+  CUSTOMER: ["UserID"],
+  DISCOUNT: ["Expiry_date", "DiscountCode"],
+  E_WALLET: ["PaymentID"],
+  GIFT_CARD: ["PaymentID"],
+  MOVIE: ["Release_date", "MovieID"],
+  MOVIE_GENRE: ["MovieID", "Genre"],
+  OPERATOR: ["StaffID"],
+  PAYMENT_METHOD: ["PaymentID"],
+  ROOM: ["TheaterID", "RoomNo"],
+  SEAT: ["TheaterID", "RoomNo", "SeatID"],
+  SHOWTIME: ["Start_datetime", "ShowID"],
+  STAFF: ["UserID"],
+  THEATER: ["TheaterID"],
+  THEATER_HOTLINE: ["TheaterID", "Hotline"],
+  TICKET: ["TicketNo"],
+  USER: ["UserID"],
+  WORK_AT: ["StaffID", "TheaterID"],
+};
+
 function findSampleTable(tableName) {
   const normalizedName = String(tableName || "").trim().toUpperCase();
   return SAMPLE_TABLES.find((table) => table === normalizedName);
@@ -83,10 +106,23 @@ app.get("/api/tables/:tableName", async (req, res) => {
     }
 
     const limit = Math.min(Math.max(Number(req.query.limit || 100), 1), 500);
-    const [rows] = await pool.query("SELECT * FROM ?? LIMIT ?", [
-      tableName,
-      limit,
-    ]);
+    const useLatestOrder = req.query.latest === "true";
+    const orderColumns = useLatestOrder
+      ? SAMPLE_TABLE_ORDER[tableName] || []
+      : [];
+
+    let sql = "SELECT * FROM ??";
+    const params = [tableName];
+
+    if (orderColumns.length > 0) {
+      sql += ` ORDER BY ${orderColumns.map(() => "?? DESC").join(", ")}`;
+      params.push(...orderColumns);
+    }
+
+    sql += " LIMIT ?";
+    params.push(limit);
+
+    const [rows] = await pool.query(sql, params);
 
     res.json(rows);
   } catch (error) {
