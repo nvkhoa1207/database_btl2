@@ -107,9 +107,73 @@ app.get("/api/tables/:tableName", async (req, res) => {
 
     const limit = Math.min(Math.max(Number(req.query.limit || 100), 1), 500);
     const useLatestOrder = req.query.latest === "true";
+
+    if (tableName === "TICKET" && useLatestOrder) {
+      const [rows] = await pool.query(
+        `
+        SELECT
+          tk.*,
+          b.Booking_date,
+          b.CustomerID,
+          b.Status AS BookingStatus,
+          b.Total_price
+        FROM TICKET tk
+        JOIN BOOKING b ON b.BookingID = tk.BookingID
+        ORDER BY b.Booking_date DESC, tk.TicketNo DESC
+        LIMIT ?
+        `,
+        [limit]
+      );
+
+      return res.json(rows);
+    }
+
     const orderColumns = useLatestOrder
       ? SAMPLE_TABLE_ORDER[tableName] || []
       : [];
+    const bookingId =
+      typeof req.query.bookingId === "string"
+        ? req.query.bookingId.trim().toUpperCase()
+        : "";
+
+    if (bookingId && tableName === "BOOKING") {
+      const [rows] = await pool.query(
+        "SELECT * FROM BOOKING WHERE BookingID = ? LIMIT ?",
+        [bookingId, limit]
+      );
+
+      return res.json(rows);
+    }
+
+    if (bookingId && tableName === "TICKET") {
+      const [rows] = await pool.query(
+        `
+        SELECT *
+        FROM TICKET
+        WHERE BookingID = ?
+        ORDER BY TicketNo
+        LIMIT ?
+        `,
+        [bookingId, limit]
+      );
+
+      return res.json(rows);
+    }
+
+    if (useLatestOrder && tableName === "TICKET") {
+      const [rows] = await pool.query(
+        `
+        SELECT t.*
+        FROM TICKET t
+        JOIN BOOKING b ON b.BookingID = t.BookingID
+        ORDER BY b.Booking_date DESC, t.TicketNo DESC
+        LIMIT ?
+        `,
+        [limit]
+      );
+
+      return res.json(rows);
+    }
 
     let sql = "SELECT * FROM ??";
     const params = [tableName];
