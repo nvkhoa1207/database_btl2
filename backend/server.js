@@ -60,6 +60,28 @@ const SAMPLE_TABLE_ORDER = {
   WORK_AT: ["StaffID", "TheaterID"],
 };
 
+const MONEY_COLUMNS = new Set([
+  "Amount",
+  "Discount_value",
+  "Price",
+  "Total_price",
+]);
+
+function normalizeMoneyForExcel(rows) {
+  return rows.map((row) => {
+    const normalizedRow = { ...row };
+
+    for (const column of MONEY_COLUMNS) {
+      if (Object.prototype.hasOwnProperty.call(normalizedRow, column)) {
+        const value = Number(normalizedRow[column]);
+        normalizedRow[column] = Number.isFinite(value) ? Math.round(value) : 0;
+      }
+    }
+
+    return normalizedRow;
+  });
+}
+
 function findSampleTable(tableName) {
   const normalizedName = String(tableName || "").trim().toUpperCase();
   return SAMPLE_TABLES.find((table) => table === normalizedName);
@@ -290,7 +312,7 @@ app.get("/api/tables/:tableName", async (req, res) => {
         [limit]
       );
 
-      return res.json(rows);
+      return res.json(normalizeMoneyForExcel(rows));
     }
 
     const orderColumns = useLatestOrder
@@ -307,7 +329,7 @@ app.get("/api/tables/:tableName", async (req, res) => {
         [bookingId, limit]
       );
 
-      return res.json(rows);
+      return res.json(normalizeMoneyForExcel(rows));
     }
 
     if (bookingId && tableName === "TICKET") {
@@ -322,7 +344,7 @@ app.get("/api/tables/:tableName", async (req, res) => {
         [bookingId, limit]
       );
 
-      return res.json(rows);
+      return res.json(normalizeMoneyForExcel(rows));
     }
 
     if (useLatestOrder && tableName === "TICKET") {
@@ -337,7 +359,7 @@ app.get("/api/tables/:tableName", async (req, res) => {
         [limit]
       );
 
-      return res.json(rows);
+      return res.json(normalizeMoneyForExcel(rows));
     }
 
     let sql = "SELECT * FROM ??";
@@ -353,7 +375,7 @@ app.get("/api/tables/:tableName", async (req, res) => {
 
     const [rows] = await pool.query(sql, params);
 
-    res.json(rows);
+    res.json(normalizeMoneyForExcel(rows));
   } catch (error) {
     res.status(500).json({ message: getSqlError(error) });
   }
